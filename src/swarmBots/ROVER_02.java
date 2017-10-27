@@ -4,18 +4,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.lang.reflect.Type;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 
-import MapSupport.Coord;
 import MapSupport.MapTile;
-import MapSupport.ScanMap;
 import common.Rover;
 import communicationInterface.Communication;
 import enums.Terrain;
@@ -81,6 +73,14 @@ public class ROVER_02 extends Rover {
 	 * 
 	 */
 	private void run() throws IOException, InterruptedException {
+		
+		// **** Define the communication parameters and open a connection to the 
+		// SwarmCommunicationServer restful service through the Communication.java class interface
+        String url = "http://localhost:2681/api"; // <----------------------  this will have to be changed if multiple servers are needed
+        String corp_secret = "gz5YhL70a2"; // not currently used - for future implementation
+        Communication com = new Communication(url, rovername, corp_secret);
+			
+
 		// Make a socket for connection to the RoverControlProcessor
 		Socket socket = null;
 		try {
@@ -105,9 +105,7 @@ public class ROVER_02 extends Rover {
 					sendTo_RCP.println(rovername); 
 					break;
 				}
-			}
-	
-	
+			}	
 			
 			/**
 			 *  ### Setting up variables to be used in the Rover control loop ###
@@ -119,6 +117,7 @@ public class ROVER_02 extends Rover {
 			boolean stuck = false; // just means it did not change locations between requests,
 									// could be velocity limit or obstruction etc.
 			boolean blocked = false;
+			boolean goingWest=false;
 	
 			// might or might not have a use for this
 			String[] cardinals = new String[4];
@@ -150,14 +149,7 @@ public class ROVER_02 extends Rover {
 			System.out.println(rovername + " TARGET_LOC " + targetLocation);
 			
 			
-	        // **** Define the communication parameters and open a connection to the 
-			// SwarmCommunicationServer restful service through the Communication.java class interface
-	        String url = "http://localhost:2681/api"; // <----------------------  this will have to be changed if multiple servers are needed
-	        String corp_secret = "gz5YhL70a2"; // not currently used - for future implementation
-	
-	        Communication com = new Communication(url, rovername, corp_secret);
-	
-
+	        
 			/**
 			 *  ####  Rover controller process loop  ####
 			 *  This is where all of the rover behavior code will go
@@ -197,44 +189,37 @@ public class ROVER_02 extends Rover {
 				timeRemaining = getTimeRemaining();
 				
 	
-				boolean goingWest=false;
+				
 				// ***** MOVING *****
 				// try moving east 5 block if blocked
 				if (blocked) {
 					if(stepCount > 0){
 						
-						if(southBlocked() == true && westBlocked() == false){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+						if(sBlocked() == true && wBlocked() == false){							
 							moveWest();
 							stepCount -=1;
 						}
-						else if(southBlocked() == true && westBlocked() == true){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+						else if(sBlocked() == true && wBlocked() == true){							
 							moveEast();
 							stepCount -=1;
 						}
-						else if(southBlocked() == true && eastBlocked() == true){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+						else if(sBlocked() == true && eBlocked() == true){							
 							moveWest();
 							stepCount -=1;
 						}
 						else{
 							moveSouth();
-
 							stepCount -=1;
-						}
-						
-							
+						}						
 					}
 					else {
-						blocked = false;
-						//reverses direction after being blocked and side stepping
+						
+						blocked = false;						
 						goingWest = !goingWest;
 					}
 					
-				} else {
-	
-					// pull the MapTile array out of the ScanMap object
+				} else {	
+					
 					MapTile[][] scanMapTiles = scanMap.getScanMap();
 					int centerIndex = (scanMap.getEdgeSize() - 1)/2;
 					// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
@@ -304,76 +289,62 @@ public class ROVER_02 extends Rover {
 	
 	// ####################### Additional Support Methods #############################
 	
-
 	
-	// add new methods and functions here
-	
-	
-	public boolean southBlocked(){
-		// pull the MapTile array out of the ScanMap object
+	public boolean sBlocked(){
+		
 		MapTile[][] scanMapTiles = scanMap.getScanMap();
 		int centerIndex = (scanMap.getEdgeSize() - 1)/2;
-		// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
-		if (scanMapTiles[centerIndex][centerIndex+1].getHasRover() 
-				|| scanMapTiles[centerIndex][centerIndex+1].getTerrain() == Terrain.SAND
+		
+		if (scanMapTiles[centerIndex][centerIndex+1].getHasRover() || scanMapTiles[centerIndex][centerIndex+1].getTerrain() == Terrain.SAND
 				|| scanMapTiles[centerIndex][centerIndex+1].getTerrain() == Terrain.NONE) {
-			System.out.println(">>>>>>>SOUTH BLOCKED<<<<<<<<");
+			System.out.println("-------SOUTH BLOCKED--------");
 			return true;
-		} else {
-			// request to server to move
+		} else {			
 			return false;
 		}
 	}
 	
-	public boolean eastBlocked(){
-		// pull the MapTile array out of the ScanMap object
+	public boolean eBlocked(){
+		
 		MapTile[][] scanMapTiles = scanMap.getScanMap();
 		int centerIndex = (scanMap.getEdgeSize() - 1)/2;
-		// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
-		if (scanMapTiles[centerIndex+1][centerIndex].getHasRover() 
-				|| scanMapTiles[centerIndex+1][centerIndex].getTerrain() == Terrain.SAND
+		
+		if (scanMapTiles[centerIndex+1][centerIndex].getHasRover() 	|| scanMapTiles[centerIndex+1][centerIndex].getTerrain() == Terrain.SAND
 				|| scanMapTiles[centerIndex+1][centerIndex].getTerrain() == Terrain.NONE) {
-			System.out.println(">>>>>>>EAST BLOCKED<<<<<<<<");
+			System.out.println("-----------EAST BLOCKED--------------");
 			return true;
-		} else {
-			// request to server to move
+		} else {			
 			return false;
 		}
 	}
 	
-	public boolean westBlocked(){
-		// pull the MapTile array out of the ScanMap object
+	public boolean wBlocked(){
+		
 		MapTile[][] scanMapTiles = scanMap.getScanMap();
 		int centerIndex = (scanMap.getEdgeSize() - 1)/2;
-		// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
+		
 		if (scanMapTiles[centerIndex-1][centerIndex].getHasRover() 
-				|| scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.SAND
+				|| scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.SAND 
 				|| scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.NONE) {
-			System.out.println(">>>>>>>WEST BLOCKED<<<<<<<<");
+			System.out.println("--------------WEST BLOCKED--------------");
 			return true;
 		} else {
-			// request to server to move
 			return false;
 		}
 	}
 	
 	
-	public boolean northBlocked(){
-		// pull the MapTile array out of the ScanMap object
+	public boolean nBlocked(){
+		
 		MapTile[][] scanMapTiles = scanMap.getScanMap();
 		int centerIndex = (scanMap.getEdgeSize() - 1)/2;
-		// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
-		if (scanMapTiles[centerIndex-1][centerIndex].getHasRover() 
-				|| scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.SAND
+		
+		if (scanMapTiles[centerIndex-1][centerIndex].getHasRover() || scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.SAND
 				|| scanMapTiles[centerIndex-1][centerIndex].getTerrain() == Terrain.NONE) {
-			System.out.println(">>>>>>>NORTH BLOCKED<<<<<<<<");
+			System.out.println("------------NORTH BLOCKED------------------");
 			return true;
 		} else {
-			// request to server to move
 			return false;
 		}
 	}
-	
-
-
 }
