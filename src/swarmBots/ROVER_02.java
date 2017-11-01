@@ -18,7 +18,15 @@ import MapSupport.MapTile;
 import MapSupport.ScanMap;
 import common.Rover;
 import communicationInterface.Communication;
+import communicationInterface.RoverDetail;
+import communicationInterface.ScienceDetail;
+import enums.RoverConfiguration;
+import enums.RoverDriveType;
+import enums.RoverMode;
+import enums.RoverToolType;
 import enums.Terrain;
+
+import rover_logic.Astar;
 
 /*
  * The seed that this program is built on is a chat program example found here:
@@ -116,6 +124,7 @@ public class ROVER_02 extends Rover {
 			int stepCount = 0;	
 			String line = "";	
 			boolean goingSouth = false;
+			boolean goingWest=false;
 			boolean stuck = false; // just means it did not change locations between requests,
 									// could be velocity limit or obstruction etc.
 			boolean blocked = false;
@@ -149,6 +158,8 @@ public class ROVER_02 extends Rover {
 			targetLocation = getTargetLocation();
 			System.out.println(rovername + " TARGET_LOC " + targetLocation);
 			
+			//A-Star object for future implementation
+			Astar aStar = new Astar();
 			
 	        // **** Define the communication parameters and open a connection to the 
 			// SwarmCommunicationServer restful service through the Communication.java class interface
@@ -187,17 +198,208 @@ public class ROVER_02 extends Rover {
 				// This sends map data to the Communications server which stores it as a global map.
 	            // This allows other rover's to access a history of the terrain this rover has moved over.
 
-	            System.out.println("do com.postScanMapTiles(currentLoc, scanMapTiles)");
+	            /*System.out.println("do com.postScanMapTiles(currentLoc, scanMapTiles)");
 	            System.out.println("post message: " + com.postScanMapTiles(currentLoc, scanMap.getScanMap()));
 	            System.out.println("done com.postScanMapTiles(currentLoc, scanMapTiles)");
-
+*/
 				
 							
 				// ***** get TIMER time remaining *****
 				timeRemaining = getTimeRemaining();
+
+				//Adding of RoverDetail and ScienceDetail as per the unified Comm server
+				RoverDetail roverDetail = new RoverDetail();
+				RoverMode roverMode = null;
+				ScienceDetail scienceDetail = analyzeAndGetSuitableScience();
+
+				//adding science/harvest
+				if (scienceDetail!=null){
+					//check for science
+					System.out.println("####### Science detail: "+scienceDetail+" ############");
+					if (scienceDetail != null) {
+
+						System.out.println("FOUND SCIENCE TO GATHER: " + scienceDetail);
+					}
+					if ( scienceDetail.getX() == getCurrentLocation().xpos
+							&& scienceDetail.getY() == getCurrentLocation().ypos ) {
+						gatherScience( getCurrentLocation() );
+						System.out.println( "$$$$$> Gathered science "
+								+ scienceDetail.getScience() + " at location "
+								+ getCurrentLocation() );
+					}
+					else {
+
+						RoverConfiguration roverConfiguration = RoverConfiguration
+								.valueOf( rovername );
+						RoverDriveType driveType = RoverDriveType.valueOf(
+								roverConfiguration.getMembers().get( 0 ) );
+						RoverToolType tool1 = RoverToolType.getEnum(
+								roverConfiguration.getMembers().get( 1 ) );
+						RoverToolType tool2 = RoverToolType.getEnum(
+								roverConfiguration.getMembers().get( 2 ) );
+
+						aStar.addScanMap( doScan(), getCurrentLocation(), tool1,
+								tool2 );
+
+						char dirChar = aStar.findPath( getCurrentLocation(),
+								new Coord( scienceDetail.getX(),
+										scienceDetail.getY() ),
+								driveType );
+						
+						System.out.println("from astar dirChar is: "+dirChar);
+						
+						//deciding direction based on the response from astar
+						if(dirChar == 'S'){
+							System.out.println("moving South, because I'm directed to go: "+dirChar);
+							moveSouth();
+						}
+						if(dirChar == 'W'){
+							System.out.println("moving West, because I'm directed to go: "+dirChar);
+							moveWest();
+						}
+						if(dirChar == 'E'){
+							System.out.println("moving East, because I'm directed to go: "+dirChar);
+							moveEast();
+						}
+						if(dirChar == 'N'){
+							System.out.println("moving North, because I'm directed to go: "+dirChar);
+							moveNorth();
+						}
+						if(dirChar == 'U'){
+							System.out.println("got U, because I'm directed to go: "+dirChar);
+							roverMode = roverMode.EXPLORE;
+						}
+						
+						//Setting gather mode
+						roverMode = roverMode.GATHER;
+
+                        System.out.println("=====> In gather mode using Astar in the direction "+ dirChar );
+					}
+
+				} // end primary addition of science/harvest
+				
+				//following else portion is for when scienceDetail is not found, this is our default movement
+			else{ //START TEST 
+					
+					//setting explore mode
+//					System.out
+//                    .println( "*****> In explore mode in the direction "
+//                        + moveTargetLocation.d );
+
+				roverMode = roverMode.EXPLORE;
+					
+					if (blocked) {
+						if(stepCount > 0){
+							if(southBlocked() == true && westBlocked() == false){
+								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+								moveWest();
+								stepCount -=1;
+							}
+							else if(southBlocked() == true && westBlocked() == true){
+								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+								moveEast();
+								stepCount -=1;
+							}
+							else if(southBlocked() == true && eastBlocked() == true){
+								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+								moveWest();
+								stepCount -=1;
+							}
+							else{
+								moveSouth();
+
+								stepCount -=1;
+							}
+						}
+						else {
+							blocked = false;
+							//reverses direction after being blocked and side stepping
+							goingWest = !goingWest;
+						}
+
+					} else {
+
+						// pull the MapTile array out of the ScanMap object
+						MapTile[][] scanMapTiles = scanMap.getScanMap();
+						int centerIndex = (scanMap.getEdgeSize() - 1)/2;
+
+						com.postScanMapTiles(currentLoc, scanMapTiles);
+						//communication.detectScience(scanMapTiles, currentLoc, centerIndex);
+						//communication.displayAllDiscoveries();
+						//communication.detectCrystalScience(scanMapTiles,currentLoc);
+						// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
+
+						if (goingWest) {
+							// check scanMap to see if path is blocked to the West
+							// (scanMap may be old data by now)
+							if (scanMapTiles[centerIndex -1][centerIndex].getHasRover() 
+									|| scanMapTiles[centerIndex -1][centerIndex].getTerrain() == Terrain.SAND
+									|| scanMapTiles[centerIndex -1][centerIndex].getTerrain() == Terrain.NONE) {
+								blocked = true;
+								stepCount = 5;  //side stepping
+							} else {
+								// request to server to move
+								moveWest();
+							}
+
+						} else {
+							// check scanMap to see if path is blocked to the East
+							// (scanMap may be old data by now)
+
+							if (scanMapTiles[centerIndex +1][centerIndex].getHasRover() 
+									|| scanMapTiles[centerIndex +1][centerIndex].getTerrain() == Terrain.SAND
+									|| scanMapTiles[centerIndex +1][centerIndex].getTerrain() == Terrain.NONE) {
+								System.out.println(">>>>>>>EAST BLOCKED<<<<<<<<");
+								blocked = true;
+								stepCount = 5;  //side stepping
+							} else {
+								// request to server to move
+								moveEast();			
+							}					
+						}
+					}
+				}//end bracket for ELSE/DEFAULT MOVEMENT 
+
+				//END following else portion is for when scienceDetail is not found, this is our default movement
+				
+				//-----> posting details of ROVER-02 in communication server
+				sendRoverDetail(roverMode);
+
+               // postScanMapTiles( currentLoc, doScan().getScanMap() );
+
+				// another call for current location
+				currentLoc = getCurrentLocation();
+
+
+
+				// test for stuckness
+				stuck = currentLoc.equals(previousLoc);	
+
+				// this is the Rovers HeartBeat, it regulates how fast the Rover cycles through the control loop
+				Thread.sleep(sleepTime);
+
+				System.out.println(rovername + " ------------ bottom process control --------------"); 
+			}  // END of Rover control While(true) loop
+
+			// This catch block closes the open socket connection to the server
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			if (socket != null) {
+				try {
+					socket.close();
+				} catch (IOException e) {
+					System.out.println(rovername + " problem closing socket");
+				}
+			}
+		}
+
+	} // END of Rover run thread
+
 				
 	
-				boolean goingWest=false;
+				/*boolean goingWest=false;
 				// ***** MOVING *****
 				// try moving east 5 block if blocked
 				if (blocked) {
@@ -301,13 +503,10 @@ public class ROVER_02 extends Rover {
 	    }
 
 	} // END of Rover run thread
-	
+*/	
 	// ####################### Additional Support Methods #############################
 	
 
-	
-	// add new methods and functions here
-	
 	
 	public boolean southBlocked(){
 		// pull the MapTile array out of the ScanMap object

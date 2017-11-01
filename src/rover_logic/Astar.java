@@ -21,7 +21,7 @@ public class Astar extends PlanetMap
     protected boolean[][][] explored;
     String url = "http://localhost:3000/api";
     String corp_secret = "gz5YhL70a2";
-    String rovername = "ROVER_03";
+    String rovername = "ROVER_02";
     Map<Coord, MapTile> globalMap = new HashMap<Coord, MapTile>();
     //only search up to known map
     // int maxKnownX = 100;
