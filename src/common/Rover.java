@@ -131,8 +131,7 @@ public class Rover {
 
 	// method to retrieve a list of this particular rover's EQUIPMENT from the server
 	protected ArrayList<String> getEquipment() throws IOException {
-		Gson gson = new GsonBuilder().setPrettyPrinting()
-				.enableComplexMapKeySerialization().create();
+		Gson gson = new GsonBuilder().setPrettyPrinting().enableComplexMapKeySerialization().create();
 		sendTo_RCP.println("EQUIPMENT");
 
 		String jsonEqListIn = receiveFrom_RCP.readLine();
@@ -142,8 +141,7 @@ public class Rover {
 		StringBuilder jsonEqList = new StringBuilder();
 
 		if (jsonEqListIn.startsWith("EQUIPMENT")) {
-			while (!(jsonEqListIn = receiveFrom_RCP.readLine())
-					.equals("EQUIPMENT_END")) {
+			while (!(jsonEqListIn = receiveFrom_RCP.readLine()).equals("EQUIPMENT_END")) {
 				if (jsonEqListIn == null) {
 					break;
 				}
@@ -159,32 +157,27 @@ public class Rover {
 
 		String jsonEqListString = jsonEqList.toString();
 		ArrayList<String> returnList;
-		returnList = gson.fromJson(jsonEqListString,
-				new TypeToken<ArrayList<String>>() {
-				}.getType());
+		returnList = gson.fromJson(jsonEqListString, new TypeToken<ArrayList<String>>() {}.getType());
 		return returnList;
 	}
 
 	// sends a SCAN request to the server and puts the result in the scanMap
 	// array
 	protected ScanMap doScan() throws IOException {
-		Gson gson = new GsonBuilder().setPrettyPrinting()
-				.enableComplexMapKeySerialization().create();
+		Gson gson = new GsonBuilder().setPrettyPrinting().enableComplexMapKeySerialization().create();
 		sendTo_RCP.println("SCAN");
 
-		String jsonScanMapIn = receiveFrom_RCP.readLine(); 
-		
+		String jsonScanMapIn = receiveFrom_RCP.readLine(); 		
 		if (jsonScanMapIn == null) {
-			System.out.println("ROVER_00 check connection to server");
+			System.out.println("ROVER_02 check connection to server");
 			jsonScanMapIn = "";
 		}
+		
 		StringBuilder jsonScanMap = new StringBuilder();
-		System.out.println("ROVER_00 incomming SCAN result - first readline: "
-				+ jsonScanMapIn);
+		System.out.println("ROVER_02 incomming SCAN result - first readline: "+ jsonScanMapIn);
 
 		if (jsonScanMapIn.startsWith("SCAN")) {
-			while (!(jsonScanMapIn = receiveFrom_RCP.readLine())
-					.equals("SCAN_END")) {
+			while (!(jsonScanMapIn = receiveFrom_RCP.readLine()).equals("SCAN_END")) {
 				jsonScanMap.append(jsonScanMapIn);
 				jsonScanMap.append("\n");
 			}
@@ -226,101 +219,73 @@ public class Rover {
 
 		ScienceDetail minDistanceScienceDetail = null;
 		try {
-			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
 
-			ScienceDetail[] scienceDetails = communication
-					.getAllScienceDetails();
+			ScienceDetail[] scienceDetails = communication.getAllScienceDetails();
 			RoverDetail[] roverDetails = communication.getAllRoverDetails();
 
 			if (roverDetails == null || roverDetails.length == 0) {
 				if (scienceDetails != null && scienceDetails.length > 0) {
-					return analyzeAndGetSuitableScienceForCurrentRover(
-							scienceDetails);
+					return analyzeAndGetSuitableScienceForCurrentRover(scienceDetails);
 				}
 			}
 
 			if (roverDetails != null && scienceDetails != null) {
-				Map<ScienceDetail, SortedMap<Integer, RoverDetail>> scienceToDistanceSortedRoverMap = getScienceToDistanceSortedRoverMap(
-						roverDetails, scienceDetails);
-				System.out.println("scienceToDistanceSortedRoverMap = "
-						+ scienceToDistanceSortedRoverMap);
-				System.out.println(
-						"*****************************************************");
+				Map<ScienceDetail, SortedMap<Integer, RoverDetail>> scienceToDistanceSortedRoverMap = getScienceToDistanceSortedRoverMap(roverDetails, scienceDetails);
+				System.out.println("scienceToDistanceSortedRoverMap = "+ scienceToDistanceSortedRoverMap);
+				System.out.println("*****************************************************");
 				for (ScienceDetail scienceDetail : scienceDetails) {
-					if (!scienceToDistanceSortedRoverMap.get(scienceDetail)
-							.isEmpty()) {
-						// Choose science where this rover is the most nearest,
-						// else
+					if (!scienceToDistanceSortedRoverMap.get(scienceDetail).isEmpty()) {
+						// Choose science where this rover is the most nearest, else
 						// do not gather any science since there are other
-						// rovers
-						// that are most nearest to all sciences.
-						Integer firstKey = scienceToDistanceSortedRoverMap
-								.get(scienceDetail).firstKey();
+						// rovers that are most nearest to all sciences.
+						Integer firstKey = scienceToDistanceSortedRoverMap.get(scienceDetail).firstKey();
 						System.out.println(scienceDetail.getScience() + "["
 								+ scienceDetail.getX() + ","
 								+ scienceDetail.getY() + "]" + " -> "
-								+ scienceToDistanceSortedRoverMap
-										.get(scienceDetail).get(firstKey)
-										.getRoverName());
-						if (rovername.equals(scienceToDistanceSortedRoverMap
-								.get(scienceDetail).get(firstKey)
-								.getRoverName())) {
+								+ scienceToDistanceSortedRoverMap.get(scienceDetail).get(firstKey).getRoverName());
+						if (rovername.equals(scienceToDistanceSortedRoverMap.get(scienceDetail).get(firstKey).getRoverName())) {
 							minDistanceScienceDetail = scienceDetail;
 							break;
 						}
 					}
 				}
-				System.out.println(
-						"*****************************************************");
+				System.out.println("*****************************************************");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 		return minDistanceScienceDetail;
 	}
 
-	private boolean canRoverPickupScience(RoverDetail roverDetail,
-			ScienceDetail scienceDetail) {
+	private boolean canRoverPickupScience(RoverDetail roverDetail, ScienceDetail scienceDetail) {
 		switch (roverDetail.getDriveType()) {
 		case TREADS:
 			switch (scienceDetail.getTerrain()) {
 			case SAND:
 			case SOIL:
 			case GRAVEL:
-				return canRoverPickupScience(roverDetail.getToolType1(),
-						scienceDetail)
-						|| canRoverPickupScience(roverDetail.getToolType2(),
-								scienceDetail);
+				return canRoverPickupScience(roverDetail.getToolType1(),scienceDetail)|| canRoverPickupScience(roverDetail.getToolType2(),scienceDetail);
 			}
 		case WHEELS:
 			switch (scienceDetail.getTerrain()) {
 			case SOIL:
 			case GRAVEL:
-				return canRoverPickupScience(roverDetail.getToolType1(),
-						scienceDetail)
-						|| canRoverPickupScience(roverDetail.getToolType2(),
-								scienceDetail);
+				return canRoverPickupScience(roverDetail.getToolType1(),scienceDetail)|| canRoverPickupScience(roverDetail.getToolType2(),scienceDetail);			
 			}
 		case WALKER:
 			switch (scienceDetail.getTerrain()) {
 			case SOIL:
 			case GRAVEL:
 			case ROCK:
-				return canRoverPickupScience(roverDetail.getToolType1(),
-						scienceDetail)
-						|| canRoverPickupScience(roverDetail.getToolType2(),
-								scienceDetail);
+				return canRoverPickupScience(roverDetail.getToolType1(),scienceDetail) || canRoverPickupScience(roverDetail.getToolType2(),scienceDetail);
 			}
 		}
 		return false;
 	}
 
-	private boolean canRoverPickupScience(RoverToolType roverToolType,
-			ScienceDetail scienceDetail) {
+	private boolean canRoverPickupScience(RoverToolType roverToolType, ScienceDetail scienceDetail) {
 		switch (roverToolType) {
 		case DRILL:
 			return scienceDetail.getScience() == Science.CRYSTAL;
@@ -332,36 +297,36 @@ public class Rover {
 			return scienceDetail.getScience() == Science.MINERAL;
 		case RADIATION_SENSOR:
 			return scienceDetail.getScience() == Science.RADIOACTIVE;
+		case MAST_CAM:
+			break;
+		case NONE:
+			break;
+		case RANGE_BOOTER:
+			break;
+		case SPECTRAL_SENSOR:
+			break;
+		default:
+			break;
 		}
 		return false;
 	}
 
-	private Map<ScienceDetail, SortedMap<Integer, RoverDetail>> getScienceToDistanceSortedRoverMap(
-			RoverDetail[] roverDetails, ScienceDetail[] scienceDetails) {
+	private Map<ScienceDetail, SortedMap<Integer, RoverDetail>> getScienceToDistanceSortedRoverMap(RoverDetail[] roverDetails, ScienceDetail[] scienceDetails) {
 
 		Map<ScienceDetail, SortedMap<Integer, RoverDetail>> scienceToDistanceSortedRoverMap = new HashMap<>();
 		try {
 			if (scienceDetails != null) {
 				for (ScienceDetail scienceDetail : scienceDetails) {
-					scienceToDistanceSortedRoverMap.put(scienceDetail,
-							new TreeMap<>());
+					scienceToDistanceSortedRoverMap.put(scienceDetail, new TreeMap<>());
 					if (roverDetails != null) {
 						for (RoverDetail roverDetail : roverDetails) {
 							// If not yet gathered by other rover
 							if (scienceDetail.getGatheredByRover() == -1) {
-								// RoverConfiguration curRoverConfig =
-								// RoverConfiguration
-								// .valueOf(roverDetail.getRoverName());
-								// Choose science terrain based on current rover
-								// drive type
-								if (canRoverPickupScience(roverDetail,
-										scienceDetail)) {
-									int distance = calculateDistance(
-											roverDetail.getX(),
-											roverDetail.getY(), scienceDetail);
-									scienceToDistanceSortedRoverMap
-											.get(scienceDetail)
-											.put(distance, roverDetail);
+								// RoverConfiguration curRoverConfig = RoverConfiguration.valueOf(roverDetail.getRoverName());
+								// Choose science terrain based on current rover drive type
+								if (canRoverPickupScience(roverDetail,scienceDetail)) {
+									int distance = calculateDistance(roverDetail.getX(),roverDetail.getY(), scienceDetail);
+									scienceToDistanceSortedRoverMap.get(scienceDetail).put(distance, roverDetail);
 								}
 							}
 						}
@@ -370,15 +335,12 @@ public class Rover {
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 		return scienceToDistanceSortedRoverMap;
 	}
 
-	protected ScienceDetail analyzeAndGetSuitableScienceForCurrentRover(
-			ScienceDetail[] scienceDetails) {
+	protected ScienceDetail analyzeAndGetSuitableScienceForCurrentRover(ScienceDetail[] scienceDetails) {
 
 		int minDistance = Integer.MAX_VALUE;
 		ScienceDetail minDistanceScienceDetail = null;
@@ -386,50 +348,36 @@ public class Rover {
 			for (ScienceDetail scienceDetail : scienceDetails) {
 				// If not yet gathered by other rover
 				if (scienceDetail.getGatheredByRover() == -1) {
-					RoverConfiguration curRoverConfig = RoverConfiguration
-							.valueOf(rovername);
-					// Choose science terrain based on current rover drive
-					// type
-					if (RoverDriveType.TREADS.name()
-							.equals(curRoverConfig.getMembers().get(0))) {
-						if (scienceDetail.getTerrain() != Terrain.ROCK
-								&& scienceDetail
-										.getTerrain() != Terrain.FLUID) {
-							int distance = calculateDistance(
-									getCurrentLocation().xpos,
-									getCurrentLocation().ypos, scienceDetail);
-							// TODO: Need another check on tools before
-							// distance
+					RoverConfiguration curRoverConfig = RoverConfiguration.valueOf(rovername);
+					// Choose science terrain based on current rover drive type
+					if (RoverDriveType.TREADS.name().equals(curRoverConfig.getMembers().get(0))) {
+						if (scienceDetail.getTerrain() != Terrain.ROCK && scienceDetail.getTerrain() != Terrain.FLUID) {
+							int distance = calculateDistance(getCurrentLocation().xpos,	getCurrentLocation().ypos, scienceDetail);
+							// TODO: Need another check on tools before distance
 							if (distance < minDistance) {
 								minDistance = distance;
 								minDistanceScienceDetail = scienceDetail;
 							}
 						}
-					} else if (RoverDriveType.WALKER.name()
-							.equals(curRoverConfig.getMembers().get(0))) {
+					} else if (RoverDriveType.WALKER.name().equals(curRoverConfig.getMembers().get(0))) {
 						if (scienceDetail.getTerrain() != Terrain.FLUID) {
-							int distance = calculateDistance(
-									getCurrentLocation().xpos,
-									getCurrentLocation().ypos, scienceDetail);
-							// TODO: Need another check on tools before
-							// distance
+							int distance = calculateDistance(getCurrentLocation().xpos,	getCurrentLocation().ypos, scienceDetail);
+							// TODO: Need another check on tools before distance
 							if (distance < minDistance) {
 								minDistance = distance;
 								minDistanceScienceDetail = scienceDetail;
 							}
 						}
-					} else if (RoverDriveType.WHEELS.name()
-							.equals(curRoverConfig.getMembers().get(0))) {
-						if (scienceDetail.getTerrain() != Terrain.SAND
+					} else if (RoverDriveType.WHEELS.name().equals(curRoverConfig.getMembers().get(0))) {
+						if (scienceDetail.getTerrain() != Terrain.SAND 
 								&& scienceDetail.getTerrain() != Terrain.ROCK
 								&& scienceDetail.getTerrain() != Terrain.FLUID
-								&& scienceDetail
-										.getTerrain() != Terrain.GRAVEL) {
+								&& scienceDetail.getTerrain() != Terrain.GRAVEL) {
+							
 							int distance = calculateDistance(
 									getCurrentLocation().xpos,
 									getCurrentLocation().ypos, scienceDetail);
-							// TODO: Need another check on tools before
-							// distance
+							// TODO: Need another check on tools before distance
 							if (distance < minDistance) {
 								minDistance = distance;
 								minDistanceScienceDetail = scienceDetail;
@@ -440,15 +388,12 @@ public class Rover {
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 		return minDistanceScienceDetail;
 	}
 
 	private int calculateDistance(int x, int y, ScienceDetail scienceDetail) {
-
 		int xDis = Math.abs(x - scienceDetail.getX());
 		int yDis = Math.abs(y - scienceDetail.getY());
 		int distance = (int) Math.sqrt(Math.abs(xDis * xDis - yDis * yDis));
@@ -460,17 +405,32 @@ public class Rover {
 		try {
 			Coord currentLoc = getCurrentLocation();
 			MapTile[][] scanMapTiles = doScan().getScanMap();
-			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
 			communication.postScanMapTiles(currentLoc, scanMapTiles);
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 	}
 
+	protected void postScanMapTiles(Coord currentLoc, MapTile[][] scanMapTiles) {
+		try {
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
+			communication.postScanMapTiles(currentLoc, scanMapTiles);
+		} catch (Exception e) {
+			System.err.println("Communication server communication failed with error: " + e.getClass() + ": " + e.getMessage());
+		}
+	}
+
+	protected void sendRoverDetail(RoverDetail roverDetail) {
+		try {
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
+			communication.sendRoverDetail(roverDetail);
+		} catch (Exception e) {
+			System.err.println("Communication server communication failed with error: " + e.getClass() + ": " + e.getMessage());
+		}
+	}
+	
 	protected void sendRoverDetail(RoverMode roverMode) {
 
 		try {
@@ -480,40 +440,30 @@ public class Rover {
 			roverDetail.setY(getCurrentLocation().ypos);
 			roverDetail.setRoverMode(roverMode);
 
-			RoverConfiguration roverConfiguration = RoverConfiguration
-					.valueOf(rovername);
+			RoverConfiguration roverConfiguration = RoverConfiguration.valueOf(rovername);
 
-			RoverDriveType driveType = RoverDriveType
-					.valueOf(roverConfiguration.getMembers().get(0));
+			RoverDriveType driveType = RoverDriveType.valueOf(roverConfiguration.getMembers().get(0));
 			roverDetail.setDriveType(driveType);
-			RoverToolType toolType1 = RoverToolType
-					.valueOf(roverConfiguration.getMembers().get(1));
+			RoverToolType toolType1 = RoverToolType.valueOf(roverConfiguration.getMembers().get(1));
 			roverDetail.setToolType1(toolType1);
-			RoverToolType tollType2 = RoverToolType
-					.valueOf(roverConfiguration.getMembers().get(2));
+			RoverToolType tollType2 = RoverToolType.valueOf(roverConfiguration.getMembers().get(2));
 			roverDetail.setToolType2(tollType2);
 
-			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
 			communication.sendRoverDetail(roverDetail);
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 	}
 
 	protected RoverDetail[] getAllRoverDetails() {
 
 		try {
-			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
 			return communication.getAllRoverDetails();
 		} catch (Exception e) {
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "	+ e.getClass() + ": " + e.getMessage());
 		}
 		return null;
 	}
@@ -521,15 +471,12 @@ public class Rover {
 	protected void gatherScience(Coord coord) {
 
 		try {
-			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+			Communication communication = new Communication("http://localhost:2681/api", rovername, "gz5YhL70a2");
 			communication.markScienceForGather(coord);
 			sendTo_RCP.println("GATHER");
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println(
-					"Communication server communication failed with error: "
-							+ e.getClass() + ": " + e.getMessage());
+			System.err.println("Communication server communication failed with error: "+ e.getClass() + ": " + e.getMessage());
 		}
 	}
 }

@@ -12,7 +12,7 @@ public class RoverDetail {
 
     private int y;
 
-    private RoverMode roverMode = RoverMode.EXPLORE;
+    private RoverMode roverMode = RoverMode.GATHER;
 
     private int targetX = -1;
 
