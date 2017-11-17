@@ -7,7 +7,12 @@ import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.HashMap;
+
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -18,7 +23,13 @@ import MapSupport.MapTile;
 import MapSupport.ScanMap;
 import common.Rover;
 import communicationInterface.Communication;
+import communicationInterface.ScienceDetail;
+import enums.RoverConfiguration;
+import enums.RoverDriveType;
+import enums.RoverMode;
+import enums.RoverToolType;
 import enums.Terrain;
+import rover_logic.Astar;
 
 /*
  * The seed that this program is built on is a chat program example found here:
@@ -74,7 +85,44 @@ public class ROVER_02 extends Rover {
 		rovername = "ROVER_02";
 		SERVER_ADDRESS = serverAddress;
 	}
+	
+	static enum Direction {
+		NORTH, SOUTH, EAST, WEST;
 
+		static Map<Character, Direction> map = new HashMap<Character, Direction>() {
+			private static final long serialVersionUID = 1L;
+
+			{
+				put('N', NORTH);
+				put('S', SOUTH);
+				put('E', EAST);
+				put('W', WEST);
+			}
+		};
+
+		static Direction get(char c) {
+			return map.get(c);
+		}
+	}
+
+	static class MoveTargetLocation {
+		Coord targetCoord;
+		Direction d;
+	}
+
+	static Map<Coord, Integer> coordVisitCountMap = new HashMap<Coord, Integer>() {
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		public Integer get(Object key) {
+			if (!containsKey(key)) {
+				super.put((Coord) key, new Integer(0));
+			}
+			return super.get(key);
+		}
+	};
+
+	Coord maxCoord = new Coord(0, 0);
 	/**
 	 * 
 	 * The Rover Main instantiates and runs the rover as a runnable thread
@@ -115,10 +163,17 @@ public class ROVER_02 extends Rover {
 			 */
 			int stepCount = 0;	
 			String line = "";	
-			boolean goingSouth = false;
+			//boolean goingSouth = false;
+
 			boolean stuck = false; // just means it did not change locations between requests,
 									// could be velocity limit or obstruction etc.
 			boolean blocked = false;
+			boolean goingWest=false;
+				
+			
+			Astar aStar = new Astar();
+			
+			RoverMode roverMode = RoverMode.GATHER;
 	
 			// might or might not have a use for this
 			String[] cardinals = new String[4];
@@ -135,6 +190,8 @@ public class ROVER_02 extends Rover {
 			 *  because they only need to be called once
 			 */		
 			
+			ScienceDetail scienceDetail = null;
+
 			// **** get equipment listing ****			
 			equipment = getEquipment();
 			System.out.println(rovername + " equipment list results " + equipment + "\n");
@@ -163,21 +220,8 @@ public class ROVER_02 extends Rover {
 			 *  This is where all of the rover behavior code will go
 			 *  
 			 */
-			while (true) {                     //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-		
-				// **** Request Rover Location from RCP ****
-				currentLoc = getCurrentLocation();
-				System.out.println(rovername + " currentLoc at start: " + currentLoc);
-				
-				// after getting location set previous equal current to be able
-				// to check for stuckness and blocked later
-				previousLoc = currentLoc;		
-				
-				
 
-				// ***** do a SCAN *****
-				// gets the scanMap from the server based on the Rover current location
-				scanMap = doScan(); 
+				
 				// prints the scanMap to the Console output for debug purposes
 				scanMap.debugPrintMap();
 				
@@ -191,30 +235,31 @@ public class ROVER_02 extends Rover {
 	            System.out.println("post message: " + com.postScanMapTiles(currentLoc, scanMap.getScanMap()));
 	            System.out.println("done com.postScanMapTiles(currentLoc, scanMapTiles)");
 
-				
+
 							
 				// ***** get TIMER time remaining *****
 				timeRemaining = getTimeRemaining();
-				
+					
 	
-				boolean goingWest=false;
 				// ***** MOVING *****
 				// try moving east 5 block if blocked
 				if (blocked) {
 					if(stepCount > 0){
 						
 						if(southBlocked() == true && westBlocked() == false){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+							System.out.println("west");
+
 							moveWest();
 							stepCount -=1;
 						}
 						else if(southBlocked() == true && westBlocked() == true){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+							System.out.println("EAST");
+
 							moveEast();
 							stepCount -=1;
 						}
 						else if(southBlocked() == true && eastBlocked() == true){
-							//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
+							System.out.println("WEST");
 							moveWest();
 							stepCount -=1;
 						}
@@ -228,7 +273,6 @@ public class ROVER_02 extends Rover {
 					}
 					else {
 						blocked = false;
-						//reverses direction after being blocked and side stepping
 						goingWest = !goingWest;
 					}
 					
@@ -282,7 +326,7 @@ public class ROVER_02 extends Rover {
 				Thread.sleep(sleepTime);
 				
 				System.out.println("ROVER_02 ------------ end process control loop --------------"); 
-			}  // ***** END of Rover control While(true) loop *****
+			  // ***** END of Rover control While(true) loop *****
 		
 			
 			
