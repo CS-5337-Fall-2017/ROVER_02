@@ -4,18 +4,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.lang.reflect.Type;
 import java.net.Socket;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import java.util.Map;
+import java.util.Stack;
 
 import MapSupport.Coord;
 import MapSupport.MapTile;
-import MapSupport.ScanMap;
 import common.Rover;
 import communicationInterface.Communication;
 import communicationInterface.RoverDetail;
@@ -27,6 +25,7 @@ import enums.RoverToolType;
 import enums.Terrain;
 
 import rover_logic.Astar;
+
 
 /*
  * The seed that this program is built on is a chat program example found here:
@@ -83,6 +82,45 @@ public class ROVER_02 extends Rover {
 		SERVER_ADDRESS = serverAddress;
 	}
 
+	static enum Direction {
+		NORTH, SOUTH, EAST, WEST;
+
+		static HashMap<Character, Direction> map = new HashMap<Character, Direction>() {
+			private static final long serialVersionUID = 1L;
+
+			{
+				put('N', NORTH);
+				put('S', SOUTH);
+				put('E', EAST);
+				put('W', WEST);
+			}
+		};
+
+		static Direction get(char c) {
+			return map.get(c);
+		}
+	}
+
+	static class MoveTargetLocation {
+		Coord targetCoord;
+		Direction d;
+	}
+
+	static Map<Coord, Integer> coordVisitCountMap = new HashMap<Coord, Integer>() {
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		public Integer get(Object key) {
+			if (!containsKey(key)) {
+				super.put((Coord) key, new Integer(0));
+			}
+			return super.get(key);
+		}
+	};
+	
+	
+	Coord maxCoord = new Coord(0, 0);
+	
 	/**
 	 * 
 	 * The Rover Main instantiates and runs the rover as a runnable thread
@@ -121,7 +159,7 @@ public class ROVER_02 extends Rover {
 			 *  ### Setting up variables to be used in the Rover control loop ###
 			 *  add more as needed
 			 */
-			int stepCount = 0;	
+	/*		int stepCount = 0;	
 			String line = "";	
 			boolean goingSouth = false;
 			boolean goingWest=false;
@@ -135,7 +173,7 @@ public class ROVER_02 extends Rover {
 			cardinals[1] = "E";
 			cardinals[2] = "S";
 			cardinals[3] = "W";	
-			String currentDir = cardinals[0];		
+			String currentDir = cardinals[0];*/		
 			
 
 			/**
@@ -203,40 +241,55 @@ public class ROVER_02 extends Rover {
 	            System.out.println("done com.postScanMapTiles(currentLoc, scanMapTiles)");
 */
 				
-							
+				MapTile[][] scanMapTiles = scanMap.getScanMap();
+				int mapTileCenter = (scanMap.getEdgeSize() - 1) / 2;
+				Coord currentLocInMapTile = new Coord(mapTileCenter, mapTileCenter);
+
+				int maxX = currentLoc.xpos + mapTileCenter;
+				int maxY = currentLoc.ypos + mapTileCenter;
+				if (maxCoord.xpos < maxX && maxCoord.ypos < maxY) {
+					maxCoord = new Coord(maxX, maxY);
+				} else if (maxCoord.xpos < maxX) {
+					maxCoord = new Coord(maxX, maxCoord.ypos);
+				} else if (maxCoord.ypos < maxY) {
+					maxCoord = new Coord(maxCoord.xpos, maxY);
+				}
+				
 				// ***** get TIMER time remaining *****
 				timeRemaining = getTimeRemaining();
 
 				//Adding of RoverDetail and ScienceDetail as per the unified Comm server
+				MoveTargetLocation moveTargetLocation = null;
 				RoverDetail roverDetail = new RoverDetail();
-				RoverMode roverMode = null;
+				
 				ScienceDetail scienceDetail = analyzeAndGetSuitableScience();
 
 				//adding science/harvest
-				if (scienceDetail!=null){
+				if (scienceDetail!=null)
+				{
+					
 					//check for science
 					System.out.println("####### Science detail: "+scienceDetail+" ############");
-					if (scienceDetail != null) {
-
-						System.out.println("FOUND SCIENCE TO GATHER: " + scienceDetail);
-					}
+					
 					if ( scienceDetail.getX() == getCurrentLocation().xpos
-							&& scienceDetail.getY() == getCurrentLocation().ypos ) {
+							&& scienceDetail.getY() == getCurrentLocation().ypos ) 
+					{
 						gatherScience( getCurrentLocation() );
 						System.out.println( "$$$$$> Gathered science "
 								+ scienceDetail.getScience() + " at location "
 								+ getCurrentLocation() );
 					}
-					else {
+					else 
+					{
 
 						RoverConfiguration roverConfiguration = RoverConfiguration
 								.valueOf( rovername );
 						RoverDriveType driveType = RoverDriveType.valueOf(
-								roverConfiguration.getMembers().get( 0 ) );
+								roverConfiguration.getMembers().get(0));
 						RoverToolType tool1 = RoverToolType.getEnum(
-								roverConfiguration.getMembers().get( 1 ) );
+								roverConfiguration.getMembers().get(1));
 						RoverToolType tool2 = RoverToolType.getEnum(
-								roverConfiguration.getMembers().get( 2 ) );
+								roverConfiguration.getMembers().get(2));
 
 						aStar.addScanMap( doScan(), getCurrentLocation(), tool1,
 								tool2 );
@@ -246,138 +299,71 @@ public class ROVER_02 extends Rover {
 										scienceDetail.getY() ),
 								driveType );
 						
+						moveTargetLocation = new MoveTargetLocation();
+						moveTargetLocation.d = Direction.get(dirChar);
+
+						roverDetail.setRoverMode(RoverMode.GATHER);
+						
 						System.out.println("from astar dirChar is: "+dirChar);
 						
-						//deciding direction based on the response from astar
-						if(dirChar == 'S'){
-							System.out.println("moving South, because I'm directed to go: "+dirChar);
-							moveSouth();
-						}
-						if(dirChar == 'W'){
-							System.out.println("moving West, because I'm directed to go: "+dirChar);
-							moveWest();
-						}
-						if(dirChar == 'E'){
-							System.out.println("moving East, because I'm directed to go: "+dirChar);
-							moveEast();
-						}
-						if(dirChar == 'N'){
-							System.out.println("moving North, because I'm directed to go: "+dirChar);
-							moveNorth();
-						}
-						if(dirChar == 'U'){
-							System.out.println("got U, because I'm directed to go: "+dirChar);
-							roverMode = roverMode.EXPLORE;
-						}
-						
-						//Setting gather mode
-						roverMode = roverMode.GATHER;
-
-                        System.out.println("=====> In gather mode using Astar in the direction "+ dirChar );
 					}
 
 				} // end primary addition of science/harvest
 				
-				//following else portion is for when scienceDetail is not found, this is our default movement
-			else{ //START TEST 
-					
-					//setting explore mode
-//					System.out
-//                    .println( "*****> In explore mode in the direction "
-//                        + moveTargetLocation.d );
-
-				roverMode = roverMode.EXPLORE;
-					
-					if (blocked) {
-						if(stepCount > 0){
-							if(southBlocked() == true && westBlocked() == false){
-								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
-								moveWest();
-								stepCount -=1;
-							}
-							else if(southBlocked() == true && westBlocked() == true){
-								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
-								moveEast();
-								stepCount -=1;
-							}
-							else if(southBlocked() == true && eastBlocked() == true){
-								//System.out.println("-----HELP ME I AM BLOCKED FROM SOUTH!!-----");
-								moveWest();
-								stepCount -=1;
-							}
-							else{
-								moveSouth();
-
-								stepCount -=1;
-							}
-						}
-						else {
-							blocked = false;
-							//reverses direction after being blocked and side stepping
-							goingWest = !goingWest;
-						}
-
-					} else {
-
-						// pull the MapTile array out of the ScanMap object
-						MapTile[][] scanMapTiles = scanMap.getScanMap();
-						int centerIndex = (scanMap.getEdgeSize() - 1)/2;
-
-						com.postScanMapTiles(currentLoc, scanMapTiles);
-						//communication.detectScience(scanMapTiles, currentLoc, centerIndex);
-						//communication.displayAllDiscoveries();
-						//communication.detectCrystalScience(scanMapTiles,currentLoc);
-						// tile S = y + 1; N = y - 1; E = x + 1; W = x - 1
-
-						if (goingWest) {
-							// check scanMap to see if path is blocked to the West
-							// (scanMap may be old data by now)
-							if (scanMapTiles[centerIndex -1][centerIndex].getHasRover() 
-									|| scanMapTiles[centerIndex -1][centerIndex].getTerrain() == Terrain.SAND
-									|| scanMapTiles[centerIndex -1][centerIndex].getTerrain() == Terrain.NONE) {
-								blocked = true;
-								stepCount = 5;  //side stepping
-							} else {
-								// request to server to move
-								moveWest();
-							}
-
-						} else {
-							// check scanMap to see if path is blocked to the East
-							// (scanMap may be old data by now)
-
-							if (scanMapTiles[centerIndex +1][centerIndex].getHasRover() 
-									|| scanMapTiles[centerIndex +1][centerIndex].getTerrain() == Terrain.SAND
-									|| scanMapTiles[centerIndex +1][centerIndex].getTerrain() == Terrain.NONE) {
-								System.out.println(">>>>>>>EAST BLOCKED<<<<<<<<");
-								blocked = true;
-								stepCount = 5;  //side stepping
-							} else {
-								// request to server to move
-								moveEast();			
-							}					
-						}
-					}
-				}//end bracket for ELSE/DEFAULT MOVEMENT 
-
-				//END following else portion is for when scienceDetail is not found, this is our default movement
 				
-				//-----> posting details of ROVER-02 in communication server
-				sendRoverDetail(roverMode);
+			else{ //START TEST 
+				moveTargetLocation = chooseMoveTargetLocation(scanMapTiles, currentLocInMapTile, currentLoc,
+						mapTileCenter);
 
-               // postScanMapTiles( currentLoc, doScan().getScanMap() );
+				System.out.println("*****> In explore mode in the direction " + moveTargetLocation.d);
 
-				// another call for current location
-				currentLoc = getCurrentLocation();
+				roverDetail.setRoverMode(RoverMode.EXPLORE);	
 
+				}//end bracket for ELSE/DEFAULT MOVEMENT 
+				if (moveTargetLocation != null && moveTargetLocation.d != null) {
+					switch (moveTargetLocation.d) {
+					case NORTH:
+						moveNorth();
+						break;
+					case EAST:
+						moveEast();
+						break;
+					case SOUTH:
+						moveSouth();
+						break;
+					case WEST:
+						moveWest();
+						break;
+					}
 
+					if (!previousLoc.equals(getCurrentLocation())) {
+						coordVisitCountMap.put(moveTargetLocation.targetCoord,
+								coordVisitCountMap.get(moveTargetLocation.targetCoord) + 1);
+					}
+				}
 
-				// test for stuckness
-				stuck = currentLoc.equals(previousLoc);	
+				try {
+					roverDetail.setRoverName(rovername);
+					roverDetail.setX(getCurrentLocation().xpos);
+					roverDetail.setY(getCurrentLocation().ypos);
 
-				// this is the Rovers HeartBeat, it regulates how fast the Rover cycles through the control loop
+					roverDetail.setDriveType(RoverDriveType.valueOf(RoverConfiguration.ROVER_02.getMembers().get(0)));
+					roverDetail.setToolType1(RoverToolType.valueOf(RoverConfiguration.ROVER_02.getMembers().get(1)));
+					roverDetail.setToolType2(RoverToolType.valueOf(RoverConfiguration.ROVER_02.getMembers().get(2)));
+
+					sendRoverDetail(roverDetail);
+
+					com.postScanMapTiles(currentLoc, scanMapTiles);
+
+				} catch (Exception e) {
+					System.err.println("Post current map to communication server failed. Cause: "
+							+ e.getClass().getName() + ": " + e.getMessage());
+				}
+
+				
+				// this is the Rovers HeartBeat, it regulates how fast the Rover
+				// cycles through the control loop
 				Thread.sleep(sleepTime);
-
 				System.out.println(rovername + " ------------ bottom process control --------------"); 
 			}  // END of Rover control While(true) loop
 
@@ -397,6 +383,138 @@ public class ROVER_02 extends Rover {
 
 	} // END of Rover run thread
 
+	private Coord getCoordNorthOf(Coord c) {
+		return new Coord(c.xpos, c.ypos - 1);
+	}
+
+	private Coord getCoordEastOf(Coord c) {
+		return new Coord(c.xpos + 1, c.ypos);
+	}
+
+	private Coord getCoordSouthOf(Coord c) {
+		return new Coord(c.xpos, c.ypos + 1);
+	}
+
+	private Coord getCoordWestOf(Coord c) {
+		return new Coord(c.xpos - 1, c.ypos);
+	}
+
+	private boolean isBlocked(MapTile[][] mapTiles, Coord c) {
+		return mapTiles[c.xpos][c.ypos].getHasRover() || mapTiles[c.xpos][c.ypos].getTerrain() == Terrain.SAND
+				|| mapTiles[c.xpos][c.ypos].getTerrain() == Terrain.NONE;
+	}
+
+	private MoveTargetLocation chooseMoveTargetLocation(MapTile[][] scanMapTiles, Coord currentLocInMapTile,
+			Coord currentLoc, int mapTileCenter) 
+	{
+		Coord northCoordInMapTile = getCoordNorthOf(currentLocInMapTile);
+		Coord eastCoordInMapTile = getCoordEastOf(currentLocInMapTile);
+		Coord southCoordInMapTile = getCoordSouthOf(currentLocInMapTile);
+		Coord westCoordInMapTile = getCoordWestOf(currentLocInMapTile);
+
+		Coord northCoord = getCoordNorthOf(currentLoc);
+		Coord eastCoord = getCoordEastOf(currentLoc);
+		Coord southCoord = getCoordSouthOf(currentLoc);
+		Coord westCoord = getCoordWestOf(currentLoc);
+
+		int min = Integer.MAX_VALUE;
+
+		MoveTargetLocation moveTargetLocation = new MoveTargetLocation();
+
+		Stack<Direction> favoredDirStack = getFavoredDirStack(currentLoc, mapTileCenter);
+
+		while (!favoredDirStack.isEmpty()) {
+			Direction d = favoredDirStack.pop();
+			switch (d) {
+			case NORTH:
+				if (!isBlocked(scanMapTiles, northCoordInMapTile) && coordVisitCountMap.get(northCoord) < min) {
+					min = coordVisitCountMap.get(northCoord);
+					moveTargetLocation.targetCoord = northCoord;
+					moveTargetLocation.d = Direction.NORTH;
+				}
+				break;
+			case EAST:
+				if (!isBlocked(scanMapTiles, eastCoordInMapTile) && coordVisitCountMap.get(eastCoord) < min) {
+					min = coordVisitCountMap.get(eastCoord);
+					moveTargetLocation.targetCoord = eastCoord;
+					moveTargetLocation.d = Direction.EAST;
+				}
+				break;
+			case SOUTH:
+				if (!isBlocked(scanMapTiles, southCoordInMapTile) && coordVisitCountMap.get(southCoord) < min) {
+					min = coordVisitCountMap.get(southCoord);
+					moveTargetLocation.targetCoord = southCoord;
+					moveTargetLocation.d = Direction.SOUTH;
+				}
+				break;
+			case WEST:
+				if (!isBlocked(scanMapTiles, westCoordInMapTile) && coordVisitCountMap.get(westCoord) < min) {
+					min = coordVisitCountMap.get(westCoord);
+					moveTargetLocation.targetCoord = westCoord;
+					moveTargetLocation.d = Direction.WEST;
+				}
+			}
+		}
+		printMoveTargetLocation(moveTargetLocation);
+		return moveTargetLocation;
+	}
+
+	private Stack<Direction> getFavoredDirStack(Coord currentLoc, int mapTileCenter) {
+		int northUnvisitedCount = 0, eastUnvisitedCount = 0, southUnvisitedCount = 0, westUnvisitedCount = 0;
+		for (int x = 0; x < currentLoc.xpos; x++) {
+			if (coordVisitCountMap.get(new Coord(x, currentLoc.ypos)) == 0) {
+				westUnvisitedCount++;
+			}
+		}
+		for (int x = currentLoc.xpos; x < maxCoord.xpos; x++) {
+			if (coordVisitCountMap.get(new Coord(x, currentLoc.ypos)) == 0) {
+				eastUnvisitedCount++;
+			}
+		}
+		for (int y = 0; y < currentLoc.ypos; y++) {
+			if (coordVisitCountMap.get(new Coord(currentLoc.xpos, y)) == 0) {
+				northUnvisitedCount++;
+			}
+		}
+		for (int y = currentLoc.ypos; y < maxCoord.ypos; y++) {
+			if (coordVisitCountMap.get(new Coord(currentLoc.xpos, y)) == 0) {
+				southUnvisitedCount++;
+			}
+		}
+		List<Integer> countList = Arrays.asList(northUnvisitedCount, eastUnvisitedCount, southUnvisitedCount,
+				westUnvisitedCount);
+		Collections.sort(countList);
+
+		Stack<Direction> directionStack = new Stack<>();
+
+		for (Integer count : countList) {
+			if (count == northUnvisitedCount && !directionStack.contains(Direction.NORTH)) {
+				directionStack.push(Direction.NORTH);
+			}
+			if (count == eastUnvisitedCount && !directionStack.contains(Direction.EAST)) {
+				directionStack.push(Direction.EAST);
+			}
+			if (count == southUnvisitedCount && !directionStack.contains(Direction.SOUTH)) {
+				directionStack.push(Direction.SOUTH);
+			}
+			if (count == westUnvisitedCount && !directionStack.contains(Direction.WEST)) {
+				directionStack.push(Direction.WEST);
+			}
+		}
+		System.out.println("counts = North(" + northUnvisitedCount + ") East(" + eastUnvisitedCount + ") South("
+				+ southUnvisitedCount + ") West(" + westUnvisitedCount + ")");
+		// System.out.println("countList = " + countList);
+		System.out.println("favoredDirStack = " + directionStack);
+		// System.out.println("coordVisitCountMap = " + coordVisitCountMap);
+
+		return directionStack;
+	}
+
+	private void printMoveTargetLocation(MoveTargetLocation moveTargetLocation) {
+		System.out.println("MoveTargetLocation.x = " + moveTargetLocation.targetCoord.xpos);
+		System.out.println("MoveTargetLocation.y = " + moveTargetLocation.targetCoord.ypos);
+		System.out.println("MoveTargetLocation.d = " + moveTargetLocation.d);
+	}
 				
 	
 				/*boolean goingWest=false;
@@ -505,10 +623,8 @@ public class ROVER_02 extends Rover {
 	} // END of Rover run thread
 */	
 	// ####################### Additional Support Methods #############################
-	
 
-	
-	public boolean southBlocked(){
+/*	public boolean southBlocked(){
 		// pull the MapTile array out of the ScanMap object
 		MapTile[][] scanMapTiles = scanMap.getScanMap();
 		int centerIndex = (scanMap.getEdgeSize() - 1)/2;
@@ -573,6 +689,6 @@ public class ROVER_02 extends Rover {
 		}
 	}
 	
-
+*/
 
 }

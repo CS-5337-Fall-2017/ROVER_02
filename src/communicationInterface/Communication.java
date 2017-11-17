@@ -219,7 +219,8 @@ public class Communication {
     
     // *** added by Spring 2016 Group 03 ***
     
-        public void sendRoverDetail(RoverDetail roverDetail) throws IOException {
+        @SuppressWarnings("unchecked")
+		public void sendRoverDetail(RoverDetail roverDetail) throws IOException {
         if (roverDetail == null) {
             throw new NullPointerException("roverDetail is null");
         }

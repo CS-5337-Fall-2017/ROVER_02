@@ -312,7 +312,7 @@ public class ROVER_33 extends Rover {
 				|| mapTiles[c.xpos][c.ypos].getTerrain() == Terrain.NONE;
 	}
 
-	private MoveTargetLocation chooseMoveTargetLocation(MapTile[][] scanMapTiles, Coord currentLocInMapTile,
+	public MoveTargetLocation chooseMoveTargetLocation(MapTile[][] scanMapTiles, Coord currentLocInMapTile,
 			Coord currentLoc, int mapTileCenter) {
 
 		Coord northCoordInMapTile = getCoordNorthOf(currentLocInMapTile);

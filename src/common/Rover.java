@@ -471,6 +471,26 @@ public class Rover {
 		}
 	}
 
+	protected void postScanMapTiles(Coord currentLoc, MapTile[][] scanMapTiles) {
+		try {
+			Communication communication = new Communication("http://localhost:3000/api", rovername, "open_secret");
+			communication.postScanMapTiles(currentLoc, scanMapTiles);
+		} catch (Exception e) {
+			System.err.println(
+					"Communication server communication failed with error: " + e.getClass() + ": " + e.getMessage());
+		}
+	}
+
+	protected void sendRoverDetail(RoverDetail roverDetail) {
+		try {
+			Communication communication = new Communication("http://localhost:3000/api", rovername, "open_secret");
+			communication.sendRoverDetail(roverDetail);
+		} catch (Exception e) {
+			System.err.println(
+					"Communication server communication failed with error: " + e.getClass() + ": " + e.getMessage());
+		}
+	}
+	
 	protected void sendRoverDetail(RoverMode roverMode) {
 
 		try {
