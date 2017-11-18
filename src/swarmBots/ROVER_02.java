@@ -125,7 +125,7 @@ public class ROVER_02 extends Rover {
 			cardinals[1] = "E";
 			cardinals[2] = "S";
 			cardinals[3] = "W";	
-			String currentDir = cardinals[0];		
+			// String currentDir = cardinals[0];		
 			
 
 			/**
