@@ -227,7 +227,7 @@ public class Rover {
 		ScienceDetail minDistanceScienceDetail = null;
 		try {
 			Communication communication = new Communication(
-					"http://localhost:3000/api", rovername, "open_secret");
+					"http://localhost:2681/api", rovername, "open_secret");
 
 			ScienceDetail[] scienceDetails = communication
 					.getAllScienceDetails();
