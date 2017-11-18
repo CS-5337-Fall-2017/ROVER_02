@@ -148,6 +148,7 @@ public class ROVER_02 extends Rover {
 			targetLocation = getTargetLocation();
 			System.out.println(rovername + " TARGET_LOC " + targetLocation);
 			
+		
 			
 	        
 			/**
@@ -188,7 +189,7 @@ public class ROVER_02 extends Rover {
 				// ***** get TIMER time remaining *****
 				timeRemaining = getTimeRemaining();
 				
-	
+				gatherScience(currentLoc);
 				
 				// ***** MOVING *****
 				// try moving east 5 block if blocked
